@@ -148,3 +148,52 @@ window.addEventListener("click", function (event) {
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded",start,{once:true});
   else start();
 })();
+
+/* Selah: identificar origen y sede en cada enlace WhatsApp del sitio.
+   No altera eventos de conversion ni envia mensajes automaticamente. */
+(function () {
+  const phones = {"50582413023":"Los Robles","50577448772":"Reparto San Juan"};
+  const params = new URLSearchParams(location.search);
+  const fromAds = params.has("gclid") || params.has("gbraid") || params.has("wbraid") ||
+    (/(google)/i.test(params.get("utm_source") || "") && /(cpc|ppc|paid)/i.test(params.get("utm_medium") || ""));
+  try { if (fromAds) sessionStorage.setItem("selah_paid_google","1"); } catch (_) {}
+  function message(branch) {
+    let paid = fromAds;
+    try { paid = paid || sessionStorage.getItem("selah_paid_google") === "1"; } catch (_) {}
+    return paid
+      ? "Hola, llegué desde un anuncio de Clínica Dental Selah en Google y quiero agendar una cita en " + branch + "."
+      : "Hola, visité la página web de Clínica Dental Selah y quiero agendar una cita en " + branch + ".";
+  }
+  function update(anchor) {
+    try {
+      const u = new URL(anchor.href);
+      if (u.hostname !== "wa.me") return;
+      const phone = u.pathname.replace(/\D/g,"");
+      if (!phones[phone]) return;
+      const text = message(phones[phone]);
+      if (u.searchParams.get("text") !== text) {
+        u.searchParams.set("text",text);
+        anchor.href = u.toString();
+      }
+    } catch (_) {}
+  }
+  function updateAll() { document.querySelectorAll('a[href*="wa.me/"]').forEach(update); }
+  document.addEventListener("click",function(e) {
+    const anchor = e.target && e.target.closest ? e.target.closest('a[href*="wa.me/"]') : null;
+    if (anchor) update(anchor);
+  },true);
+  let queued = false;
+  const observer = new MutationObserver(function() {
+    if (queued) return;
+    queued = true;
+    setTimeout(function(){queued=false;updateAll();},100);
+  });
+  function start() {
+    updateAll();
+    observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["href"]});
+    setTimeout(updateAll,700);
+    setTimeout(updateAll,2000);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded",start,{once:true});
+  else start();
+})();
