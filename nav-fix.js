@@ -178,6 +178,11 @@ window.addEventListener("click", function (event) {
     } catch (_) {}
   }
   function updateAll() { document.querySelectorAll('a[href*="wa.me/"]').forEach(update); }
+  // Actualizar el enlace al instante en el gesto del usuario, incluso si React acaba de renderizarlo.
+  document.addEventListener("pointerdown",function(e) {
+    const anchor = e.target && e.target.closest ? e.target.closest('a[href*="wa.me/"]') : null;
+    if (anchor) update(anchor);
+  },true);
   document.addEventListener("click",function(e) {
     const anchor = e.target && e.target.closest ? e.target.closest('a[href*="wa.me/"]') : null;
     if (anchor) update(anchor);
