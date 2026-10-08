@@ -24,58 +24,92 @@ window.addEventListener("click", function (event) {
 }, true);
 
 
-/* Selah: mejora reversible de la portada para búsquedas dentales generales.
-   No altera las etiquetas de Google Ads ni el seguimiento de clics a wa.me. */
+/* Selah: CTA prioritario WhatsApp y elección de sede.
+   Conserva los enlaces originales y los eventos de medición de Google Ads. */
 (function () {
   if (location.pathname !== "/") return;
-  function optimizeHome() {
-    const root = document.querySelector("#root");
-    if (!root) return;
-    const hero = root.querySelector("main section");
-    if (!hero) return;
-
-    // Conservar la promoción en la sección de ortodoncia, no en el primer impacto genérico.
-    const promo = Array.from(hero.querySelectorAll("span")).find(el =>
-      el.textContent.trim().toUpperCase() === "PROMOCIÓN DE ORTODONCIA");
-    if (promo && promo.parentElement) promo.parentElement.style.display = "none";
-
-    // Priorizar un único camino visible hacia WhatsApp en el hero.
-    const direct = Array.from(hero.querySelectorAll("a")).find(el =>
-      el.textContent.trim() === "WhatsApp directo" && el.href.includes("wa.me/"));
-    const formLink = Array.from(hero.querySelectorAll("a")).find(el =>
-      el.textContent.trim() === "Solicitar cita en 1 minuto");
-    if (direct) {
-      const label = direct.querySelector("span");
-      if (label) label.textContent = "Agendar por WhatsApp";
-      direct.setAttribute("aria-label", "Agendar cita por WhatsApp en Clínica Dental Selah");
-    }
-    if (formLink) {
-      formLink.style.background = "transparent";
-      formLink.style.color = "#155e63";
-      formLink.style.border = "1px solid #b7d9dc";
-      formLink.style.boxShadow = "none";
-      const label = formLink.querySelector("span");
-      if (label) label.textContent = "Prefiero completar mis datos";
-    }
-
-    // Mensajes neutrales para enlaces genéricos. No modificar enlaces de servicios
-    // con una intención específica ni la lógica de medición existente.
-    root.querySelectorAll('a[href*="wa.me/"]').forEach(link => {
-      try {
-        const url = new URL(link.href);
-        if (url.hostname !== "wa.me") return;
-        const message = url.searchParams.get("text") || "";
-        if (!message.includes("u otro servicio dental")) return;
-        const branch = url.pathname.includes("50577448772") ? "Reparto San Juan" : "Los Robles";
-        url.searchParams.set("text",
-          "Hola, quiero información o agendar una cita en Clínica Dental Selah. Mi sede preferida es " + branch + ". ¿Me pueden ayudar?");
-        link.href = url.toString();
-      } catch (_) {}
-    });
+  const messages = {
+    "50582413023": "Hola, quiero información y agendar una cita en Clínica Dental Selah, sede Los Robles. ¿Qué horarios tienen disponibles?",
+    "50577448772": "Hola, quiero información y agendar una cita en Clínica Dental Selah, sede Reparto San Juan. ¿Qué horarios tienen disponibles?"
+  };
+  let working = false;
+  function optimize() {
+    if (working) return;
+    working = true;
+    try {
+      const root = document.getElementById("root");
+      if (!root) return;
+      const hero = root.querySelector("main section") || root.querySelector("main");
+      if (!hero) return;
+      const anchors = Array.from(hero.querySelectorAll("a"));
+      const direct = anchors.find(a => a.textContent.includes("WhatsApp directo") && a.href.includes("wa.me/"));
+      const form = anchors.find(a => a.textContent.includes("Solicitar cita en 1 minuto"));
+      if (direct) {
+        const label = Array.from(direct.querySelectorAll("span")).find(s => s.textContent.trim() === "WhatsApp directo");
+        if (label) label.textContent = "Agendar por WhatsApp";
+        direct.setAttribute("aria-label", "Agendar cita por WhatsApp, sede Los Robles");
+      }
+      if (form) {
+        const label = Array.from(form.querySelectorAll("span")).find(s => s.textContent.trim() === "Solicitar cita en 1 minuto");
+        if (label) label.textContent = "Prefiero completar mis datos";
+        form.style.backgroundColor = "transparent";
+        form.style.color = "#155e63";
+        form.style.border = "1px solid #b7d9dc";
+        form.style.boxShadow = "none";
+      }
+      const promo = Array.from(hero.querySelectorAll("span,div,p")).find(e =>
+        e.children.length === 0 && e.textContent.trim().toUpperCase() === "PROMOCIÓN DE ORTODONCIA");
+      if (promo) {
+        const badge = promo.closest(".inline-flex") || promo.parentElement;
+        if (badge && badge !== hero) badge.style.display = "none";
+      }
+      // Solo sustituir mensajes generales, sin tocar campañas ni enlaces de servicios específicos.
+      root.querySelectorAll('a[href*="wa.me/"]').forEach(a => {
+        try {
+          const u = new URL(a.href);
+          const phone = u.pathname.replace(/\D/g, "");
+          const current = u.searchParams.get("text") || "";
+          if (u.hostname === "wa.me" && messages[phone] && current.includes("u otro servicio dental")) {
+            u.searchParams.set("text", messages[phone]);
+            a.href = u.toString();
+          }
+        } catch (_) {}
+      });
+      if (direct && !document.getElementById("selah-branch-choice")) {
+        const row = document.createElement("div");
+        row.id = "selah-branch-choice";
+        row.style.cssText = "display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;align-items:center";
+        const label = document.createElement("span");
+        label.textContent = "O agenda directamente en:";
+        label.style.cssText = "font-size:13px;color:#334155";
+        row.appendChild(label);
+        [["Los Robles","50582413023"],["Reparto San Juan","50577448772"]].forEach(([name,phone]) => {
+          const a = document.createElement("a");
+          a.href = "https://wa.me/" + phone + "?text=" + encodeURIComponent(messages[phone]);
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          a.textContent = name + " · WhatsApp";
+          a.style.cssText = "display:inline-block;padding:10px 14px;border-radius:22px;background:#e8f8ed;color:#17683a;font-size:13px;font-weight:700;text-decoration:none";
+          row.appendChild(a);
+        });
+        const parent = direct.parentElement;
+        if (parent) parent.insertAdjacentElement("afterend",row);
+      }
+    } finally { working = false; }
   }
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => setTimeout(optimizeHome, 250), {once:true});
-  } else {
-    setTimeout(optimizeHome, 250);
+  let pending = false;
+  const observer = new MutationObserver(() => {
+    if (pending || working) return;
+    pending = true;
+    requestAnimationFrame(() => { pending = false; optimize(); });
+  });
+  function start() {
+    optimize();
+    const root = document.getElementById("root");
+    if (root) observer.observe(root,{childList:true,subtree:true});
+    setTimeout(optimize,800);
+    setTimeout(optimize,2200);
   }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded",start,{once:true});
+  else start();
 })();
